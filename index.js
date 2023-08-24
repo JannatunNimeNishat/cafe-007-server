@@ -10,7 +10,23 @@ app.use(express.json());
 
 
 
-
+// verifyJWT
+const verifyJWT = async (req, res, next) => {
+  const access_token = req.body.access_token;
+  // console.log(access_token);
+  if (!access_token) {
+    return res.status(401).send({ error: true, message: 'unauthorized access' })
+  }
+  const token = access_token.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+    if (error) {
+      res.status(401).send({ error: true, message: 'unauthorized access token not match' });
+    }
+    req.decoded = decoded;
+    // console.log(decoded);
+    next();
+  })
+}
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.oth2isl.mongodb.net/?retryWrites=true&w=majority`;
@@ -29,33 +45,33 @@ async function run() {
 
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
-   
-    const menuCollection = client.db('cafe-077-db').collection('menu');
 
+    const menuCollection = client.db('cafe-077-db').collection('menu');
+    const cartCollection = client.db('cafe-077-db').collection('cart');
     app.post('/jwt', (req, res) => {
-        const email = req.body;
-        
-        const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-    
-       
-    
-        res.send({ token });
+      const email = req.body;
+
+      const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+
+
+      res.send({ token });
     })
 
     // get all menu data by category
-    app.get('/menu/:value', async(req,res) =>{
-        const category = req.params.value;
-        
-        const menu = await menuCollection.find().toArray();
-        const selectedMenu = menu.filter(item => item.category ===  category);
+    app.get('/menu/:value', async (req, res) => {
+      const category = req.params.value;
 
-        res.send(selectedMenu);
+      const menu = await menuCollection.find().toArray();
+      const selectedMenu = menu.filter(item => item.category === category);
+
+      res.send(selectedMenu);
     })
 
     //get single menu item details
-    app.get('/menu_item_details/:_id', async(req,res)=>{
+    app.get('/menu_item_details/:_id', async (req, res) => {
       const id = req.params._id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
 
       const menuItemDetails = await menuCollection.findOne(query);
 
@@ -63,9 +79,21 @@ async function run() {
 
     })
 
+    //add item to cart
+    app.post('/add_to_cart/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+     
+      const decodedEmail = req.decoded.loggedUser.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'forbidden access' });
+      }
+      const item = req.body.addItem;
+      const result = await cartCollection.insertOne(item);
+      res.send(result);
+    })
 
 
- // Send a ping to confirm a successful connection
+    // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
@@ -84,12 +112,12 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('cafe-007 server is running');
+  res.send('cafe-007 server is running');
 })
 
 
 app.listen(port, () => {
-    console.log(`cafe 007 server running at port: ${port}`);
+  console.log(`cafe 007 server running at port: ${port}`);
 })
 
 
