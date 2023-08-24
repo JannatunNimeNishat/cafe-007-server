@@ -13,7 +13,7 @@ app.use(express.json());
 // verifyJWT
 const verifyJWT = async (req, res, next) => {
   const access_token = req.body.access_token;
-  // console.log(access_token);
+  // console.log('body',req.body);
   if (!access_token) {
     return res.status(401).send({ error: true, message: 'unauthorized access' })
   }
@@ -82,7 +82,7 @@ async function run() {
     //add item to cart
     app.post('/add_to_cart/:email', verifyJWT, async (req, res) => {
       const email = req.params.email;
-     
+
       const decodedEmail = req.decoded.loggedUser.email;
       if (email !== decodedEmail) {
         return res.status(403).send({ error: true, message: 'forbidden access' });
@@ -90,7 +90,39 @@ async function run() {
       const item = req.body.addItem;
       const result = await cartCollection.insertOne(item);
       res.send(result);
+    });
+
+
+    //get cart items
+    app.post('/cartItems/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const decodedEmail = req?.decoded?.loggedUser?.email;
+      // console.log(email, 'decoded_email:', decodedEmail);
+      if (email !== decodedEmail) {
+        return res.send({ error: true, message: 'forbidden access' });
+      }
+
+      const query = { email: decodedEmail }
+
+      const result = await cartCollection.find(query).toArray();
+
+
+
+      res.send(result);
+
+
+    });
+
+    // delete a cart Item
+    app.delete('/delete_cart_item/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await cartCollection.deleteOne(query);
+      res.send(result);
     })
+
+
+
 
 
     // Send a ping to confirm a successful connection
